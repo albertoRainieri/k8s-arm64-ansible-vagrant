@@ -1,0 +1,138 @@
+---
+- name: Initialize Kubernetes Cluster on Master Node
+  hosts: masters
+  become: yes
+  become_method: sudo
+  become_user: root
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - name: Include variables
+      ansible.builtin.include_vars:
+        vars.yaml
+
+    - name: Pull required container images
+      ansible.builtin.command: kubeadm config images pull
+      register: pull_output
+      changed_when: false
+
+    - name: Display pulled images
+      ansible.builtin.debug:
+        var: pull_output.stdout_lines
+
+    - name: Initialize Kubernetes cluster
+      ansible.builtin.command: >
+        kubeadm init 
+        --apiserver-advertise-address={{ ip_master }} 
+        --pod-network-cidr={{ subnet_pod }}
+        --ignore-preflight-errors=all
+      register: init_output
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    - name: Display initialization output
+      ansible.builtin.debug:
+        var: init_output.stdout_lines
+
+    - name: Create .kube directory for vagrant user
+      ansible.builtin.file:
+        path: "{{ ansible_node_path }}/.kube"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: '0755'
+
+    - name: Copy admin.conf to vagrant user
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ ansible_node_path }}/.kube/config"
+        remote_src: yes
+        owner: vagrant
+        group: vagrant
+        mode: '0644'
+
+    - name: Create .kube directory for root user
+      ansible.builtin.file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+
+    - name: Copy admin.conf to root user
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: yes
+        mode: '0644'
+
+    - name: Download Calico manifest
+      ansible.builtin.get_url:
+        url: "https://docs.projectcalico.org/manifests/calico.yaml"
+        dest: "{{ ansible_node_path }}/calico.yaml"
+        mode: '0644'
+
+    - name: Deploy Calico network
+      ansible.builtin.command: kubectl apply -f calico.yaml
+      args:
+        chdir: "{{ ansible_node_path }}"
+      become_user: vagrant
+
+    - name: Generate join command
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: join_command
+      changed_when: false
+
+    - name: Save join command to file
+      ansible.builtin.copy:
+        content: "{{ join_command.stdout }}"
+        dest: "{{ ansible_node_path }}/join-command"
+        mode: '0644'
+        owner: vagrant
+        group: vagrant
+
+    - name: Display join command
+      ansible.builtin.debug:
+        msg: "Join command: {{ join_command.stdout }}"
+
+    - name: Install Helm
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: "{{ ansible_node_path }}/get_helm.sh"
+        mode: '0755'
+
+    - name: Execute Helm installation
+      ansible.builtin.command: "{{ ansible_node_path }}/get_helm.sh"
+      become_user: vagrant
+      args:
+        creates: "{{ ansible_node_path }}/.local/bin/helm"
+
+    - name: Create kubectl alias
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_node_path }}/.bashrc"
+        line: "alias k='kubectl'"
+        state: present
+
+    - name: Create kubectl alias for root
+      ansible.builtin.lineinfile:
+        path: /root/.bashrc
+        line: "alias k='kubectl'"
+        state: present
+
+    - name: Install kubectl bash completion
+      ansible.builtin.command: kubectl completion bash
+      register: kubectl_completion
+      changed_when: false
+
+    - name: Save kubectl completion
+      ansible.builtin.copy:
+        content: "{{ kubectl_completion.stdout }}"
+        dest: /etc/bash_completion.d/kubectl
+        mode: '0644'
+
+    - name: Fetch kubeconfig to local machine
+      ansible.builtin.fetch:
+        src: "{{ ansible_node_path }}/.kube/config"
+        dest: "./.kube/config-arm64" # that is the dir of ansible playbook
+        flat: yes
+      # delegate_to: localhost
+      # become: no 

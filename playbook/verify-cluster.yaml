@@ -1,0 +1,65 @@
+---
+- name: Verify Kubernetes Cluster Status
+  hosts: masters
+  become: no
+  gather_facts: no
+  connection: ssh
+
+  tasks:
+    - name: Include variables
+      ansible.builtin.include_vars:
+        vars.yaml
+
+    - name: Check cluster info
+      ansible.builtin.command: kubectl cluster-info
+      register: cluster_info
+      changed_when: false
+
+    - name: Display cluster info
+      ansible.builtin.debug:
+        var: cluster_info.stdout_lines
+
+    - name: Get all nodes
+      ansible.builtin.command: kubectl get nodes -o wide
+      register: nodes
+      changed_when: false
+
+    - name: Display nodes
+      ansible.builtin.debug:
+        var: nodes.stdout_lines
+
+    - name: Get all pods in kube-system
+      ansible.builtin.command: kubectl get pods -n kube-system
+      register: kube_system_pods
+      changed_when: false
+
+    - name: Display kube-system pods
+      ansible.builtin.debug:
+        var: kube_system_pods.stdout_lines
+
+    - name: Get all pods in calico-system
+      ansible.builtin.command: kubectl get pods -n calico-system
+      register: calico_pods
+      changed_when: false
+
+    - name: Display calico-system pods
+      ansible.builtin.debug:
+        var: calico_pods.stdout_lines
+
+    - name: Check kubelet status
+      ansible.builtin.systemd:
+        name: kubelet
+      register: kubelet_status
+
+    - name: Display kubelet status
+      ansible.builtin.debug:
+        msg: "Kubelet status: {{ kubelet_status.status.ActiveState }}"
+
+    - name: Test cluster connectivity
+      ansible.builtin.command: kubectl get cs
+      register: component_status
+      changed_when: false
+
+    - name: Display component status
+      ansible.builtin.debug:
+        var: component_status.stdout_lines 

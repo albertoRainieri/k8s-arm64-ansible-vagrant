@@ -1,0 +1,75 @@
+---
+- name: Join Worker Nodes to Kubernetes Cluster
+  hosts: workers
+  become: yes
+  become_method: sudo
+  become_user: root
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+    - name: Include variables
+      ansible.builtin.include_vars:
+        vars.yaml
+
+    - name: Set hostname based on inventory
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+      become: yes
+
+    - name: Update /etc/hosts with new hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1'
+        line: "127.0.1.1 {{ inventory_hostname }}"
+        state: present
+      become: yes
+
+    - name: Copy join command from master
+      ansible.builtin.synchronize:
+        src: "/home/vagrant/join-command"
+        dest: "/tmp/join-command"
+        mode: push
+      delegate_to: "{{ groups['masters'][0] }}"
+
+    - name: Reset kubeadm on worker nodes
+      ansible.builtin.command: kubeadm reset -f
+      ignore_errors: true
+
+    - name: Remove Kubernetes config directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /etc/kubernetes
+        - /var/lib/kubelet
+        - /var/lib/etcd
+        - /etc/cni
+
+
+    - name: Join worker node to cluster
+      ansible.builtin.command: bash /tmp/join-command
+      args:
+        creates: /etc/kubernetes/kubelet.conf
+
+    - name: Create kubectl alias
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_node_path }}/.bashrc"
+        line: "alias k='kubectl'"
+        state: present
+
+    - name: Create kubectl alias for root
+      ansible.builtin.lineinfile:
+        path: /root/.bashrc
+        line: "alias k='kubectl'"
+        state: present
+
+    - name: Wait for node to be ready
+      ansible.builtin.command: kubectl get nodes
+      register: node_status
+      changed_when: false
+      retries: 30
+      delay: 10
+      until: node_status.rc == 0
+      delegate_to: "{{ groups['masters'][0] }}"
+      become_user: vagrant

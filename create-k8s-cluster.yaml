@@ -1,0 +1,26 @@
+---
+- name: Create Kubernetes Cluster on ARM64
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  tasks:
+    - name: Display cluster creation start
+      ansible.builtin.debug:
+        msg: "Starting Kubernetes ARM64 cluster creation..."
+
+    - name: Install and configure Kubernetes on all nodes
+      ansible.builtin.include_tasks: playbook/install-k8s.yaml
+
+    - name: Initialize cluster on master node
+      ansible.builtin.include_tasks: playbook/initialize-cluster.yaml
+
+    - name: Join worker nodes to cluster
+      ansible.builtin.include_tasks: playbook/join-cluster.yaml
+
+    - name: Verify cluster status
+      ansible.builtin.include_tasks: playbook/verify-cluster.yaml
+
+    - name: Display cluster creation completion
+      ansible.builtin.debug:
+        msg: "Kubernetes ARM64 cluster creation completed!" 

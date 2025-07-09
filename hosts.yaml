@@ -1,0 +1,25 @@
+all:
+  children:
+    masters:
+      hosts:
+        kmaster:
+          ansible_host: 192.168.59.100
+          ansible_user: vagrant
+          ansible_ssh_pass: vagrant
+          ansible_become_pass: vagrant
+    workers:
+      hosts:
+        kworker1:
+          ansible_host: 192.168.59.101
+          ansible_user: vagrant
+          ansible_ssh_pass: vagrant
+          ansible_become_pass: vagrant
+        kworker2:
+          ansible_host: 192.168.59.102
+          ansible_user: vagrant
+          ansible_ssh_pass: vagrant
+          ansible_become_pass: vagrant
+    k8s_cluster:
+      children:
+        masters:
+        workers: 
