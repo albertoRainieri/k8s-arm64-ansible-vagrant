@@ -177,42 +177,6 @@ kubectl get pods -A      # List all pods
 kubectl cluster-info     # Cluster information
 ```
 
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **ARM64 Compatibility**: Ensure your virtualization provider supports ARM64 architecture
-2. **Memory Issues**: Increase memory allocation if nodes fail to start
-3. **Network Issues**: Check if the private network IPs are available
-4. **Ansible Connection**: Ensure SSH password authentication is enabled
-
-### Manual Worker Node Join
-
-If automatic joining fails, you can manually join worker nodes:
-
-```bash
-# On master node, get the join command
-kubeadm token create --print-join-command
-
-# On worker node, run the join command
-kubeadm join 192.168.59.100:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
-```
-
-### Reset Cluster
-
-To reset the cluster and start fresh:
-
-```bash
-# On master node
-kubeadm reset -f
-
-# On worker nodes
-kubeadm reset -f
-
-# Remove Kubernetes directories
-rm -rf /etc/kubernetes /var/lib/kubelet /var/lib/etcd /etc/cni
-```
-
 ## 🎯 Use Cases
 
 - Development and testing environments
@@ -220,26 +184,3 @@ rm -rf /etc/kubernetes /var/lib/kubelet /var/lib/etcd /etc/cni
 - CI/CD pipeline testing
 - Local development clusters
 - ARM64 infrastructure validation
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Kubernetes community for the excellent documentation
-- Ansible team for the powerful automation framework
-- Vagrant team for the virtualization management tool
-- Calico project for the network plugin
-
----
-
-**Happy Kubernetes clustering! 🎉** 
